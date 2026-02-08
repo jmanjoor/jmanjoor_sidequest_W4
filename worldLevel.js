@@ -1,79 +1,81 @@
-/*
-WorldLevel.js (Example 5)
-
-WorldLevel wraps ONE level object from levels.json and provides:
-- Theme colours (background/platform/blob)
-- Physics parameters that influence the player (gravity, jump velocity)
-- Spawn position for the player (start)
-- An array of Platform instances
-- A couple of helpers to size the canvas to fit the geometry
-
-This is directly inspired by your original blob sketch’s responsibilities: 
-- parse JSON
-- map platforms array
-- apply theme + physics
-- infer canvas size
-
-Expected JSON shape for each level (from your provided file): 
-{
-  "name": "Intro Steps",
-  "gravity": 0.65,
-  "jumpV": -11.0,
-  "theme": { "bg":"...", "platform":"...", "blob":"..." },
-  "start": { "x":80, "y":220, "r":26 },
-  "platforms": [ {x,y,w,h}, ... ]
-}
-*/
-
 class WorldLevel {
   constructor(levelJson) {
-    // A readable label for HUD.
     this.name = levelJson.name || "Level";
 
-    // Theme defaults + override with JSON.
     this.theme = Object.assign(
       { bg: "#F0F0F0", platform: "#C8C8C8", blob: "#1478FF" },
       levelJson.theme || {},
     );
 
-    // Physics knobs (the blob player will read these).
     this.gravity = levelJson.gravity ?? 0.65;
     this.jumpV = levelJson.jumpV ?? -11.0;
 
-    // Player spawn data.
-    // Use optional chaining so levels can omit fields safely.
-    this.start = {
-      x: levelJson.start?.x ?? 80,
-      y: levelJson.start?.y ?? 180,
-      r: levelJson.start?.r ?? 26,
-    };
+    this.tileSize = levelJson.tileSize ?? 40;
 
-    // Convert raw platform objects into Platform instances.
-    this.platforms = (levelJson.platforms || []).map((p) => new Platform(p));
+    this.platforms = [];
+    this.coins = [];
+    this.door = null;
+
+    // spawn away from the top coins
+    this.start = { x: this.tileSize * 2, y: this.tileSize * 4, r: 26 };
+
+    const map = levelJson.map || [];
+    this.mapHeight = map.length;
+    this.mapWidth = map[0]?.length ?? 0;
+
+    for (let row = 0; row < map.length; row++) {
+      const line = map[row];
+
+      for (let col = 0; col < line.length; col++) {
+        const ch = line[col];
+        const x = col * this.tileSize;
+        const y = row * this.tileSize;
+
+        if (ch === "#") {
+          // thin ledge at bottom of the tile cell
+          this.platforms.push(
+            new Platform({
+              x,
+              y: y + this.tileSize - 12,
+              w: this.tileSize,
+              h: 12,
+            }),
+          );
+        } else if (ch === "C") {
+          // coin centered, slightly raised so it doesn't sit inside the ledge
+          this.coins.push(
+            new Coin({
+              x: x + this.tileSize / 2,
+              y: y + this.tileSize / 2 - 8,
+              r: 10,
+            }),
+          );
+        } else if (ch === "D") {
+          this.door = new Door({ x, y, w: this.tileSize, h: this.tileSize });
+        }
+      }
+    }
   }
 
-  /*
-  If you want the canvas to fit the world, you can infer width/height by
-  finding the maximum x+w and y+h across all platforms.
-  */
+  drawWorld() {
+    background(color(this.theme.bg));
+
+    for (const p of this.platforms) p.draw(color(this.theme.platform));
+    for (const c of this.coins) c.draw();
+
+    const allCoinsCollected =
+      this.coins.length > 0 && this.coins.every((c) => c.collected);
+
+    if (allCoinsCollected && this.door) this.door.draw();
+  }
+
   inferWidth(defaultW = 640) {
-    if (!this.platforms.length) return defaultW;
-    return max(this.platforms.map((p) => p.x + p.w));
+    if (!this.mapWidth) return defaultW;
+    return this.mapWidth * this.tileSize;
   }
 
   inferHeight(defaultH = 360) {
-    if (!this.platforms.length) return defaultH;
-    return max(this.platforms.map((p) => p.y + p.h));
-  }
-
-  /*
-  Draw only the world (background + platforms).
-  The player draws itself separately, after the world is drawn.
-  */
-  drawWorld() {
-    background(color(this.theme.bg));
-    for (const p of this.platforms) {
-      p.draw(color(this.theme.platform));
-    }
+    if (!this.mapHeight) return defaultH;
+    return this.mapHeight * this.tileSize;
   }
 }
