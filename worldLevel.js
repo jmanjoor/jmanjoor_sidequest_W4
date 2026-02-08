@@ -7,6 +7,7 @@ class WorldLevel {
       levelJson.theme || {},
     );
 
+    // Use JSON values as defaults, but we may auto-tune jumpV later
     this.gravity = levelJson.gravity ?? 0.65;
     this.jumpV = levelJson.jumpV ?? -11.0;
 
@@ -16,16 +17,13 @@ class WorldLevel {
     this.coins = [];
     this.door = null;
 
-    // spawn away from the top coins
-    this.start = { x: this.tileSize * 2, y: this.tileSize * 4, r: 26 };
-
     const map = levelJson.map || [];
     this.mapHeight = map.length;
     this.mapWidth = map[0]?.length ?? 0;
 
+    // Build objects from tilemap using loops (Week 4 requirement)
     for (let row = 0; row < map.length; row++) {
       const line = map[row];
-
       for (let col = 0; col < line.length; col++) {
         const ch = line[col];
         const x = col * this.tileSize;
@@ -42,7 +40,6 @@ class WorldLevel {
             }),
           );
         } else if (ch === "C") {
-          // coin centered, slightly raised so it doesn't sit inside the ledge
           this.coins.push(
             new Coin({
               x: x + this.tileSize / 2,
@@ -53,6 +50,42 @@ class WorldLevel {
         } else if (ch === "D") {
           this.door = new Door({ x, y, w: this.tileSize, h: this.tileSize });
         }
+      }
+    }
+
+    // ----------------------------
+    // AUTO-TUNE: spawn + jump reach
+    // ----------------------------
+
+    const playerR = 26; // matches your Blob default
+
+    // Ground is the lowest platform surface
+    let groundY = this.mapHeight * this.tileSize;
+    if (this.platforms.length > 0) {
+      groundY = Math.max(...this.platforms.map((p) => p.y + p.h));
+    }
+
+    // Spawn the player on ground near the left (always valid)
+    this.start = {
+      x: this.tileSize * 2,
+      y: groundY - playerR - 2,
+      r: playerR,
+    };
+
+    // If there are coins, make sure jump is strong enough to reach the highest one
+    if (this.coins.length > 0) {
+      const highestCoinY = Math.min(...this.coins.map((c) => c.y));
+
+      // How high the player center must rise (rough, but works well)
+      const neededHeight = groundY - playerR - highestCoinY;
+
+      // Current max jump height from physics: v^2 / (2g)
+      const currentMaxHeight = Math.abs(this.jumpV) ** 2 / (2 * this.gravity);
+
+      const buffer = 30; // forgiveness so it doesn't feel pixel-perfect
+      if (neededHeight + buffer > currentMaxHeight) {
+        const newV = Math.sqrt(2 * this.gravity * (neededHeight + buffer));
+        this.jumpV = -Math.min(newV, 25); // clamp so it doesn't get ridiculous
       }
     }
   }
