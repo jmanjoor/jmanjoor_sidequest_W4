@@ -7,7 +7,7 @@ GBDA302 Week 4 Example 5: Blob Platformer (JSON + Classes)
 ## Authors
 
 Karen Cochrane and David Han (starter code)
-Student modifications and extensions to meet Week 4 criteria
+I added modifications and extensions to meet Week 4 criteria
 
 ---
 
@@ -23,7 +23,7 @@ Levels are defined in levels.json using a tilemap array, and the game uses neste
 
 Learning Goals:
 
-- - load JSON in preload()
+- - load JSON in preload( )
 - - generate levels using JSON data (tilemap array)
 - - use loops to dynamically place platforms, coins, and the exit door
 - - create WorldLevel from JSON
